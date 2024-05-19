@@ -140,24 +140,13 @@ def plot_correlation_matrix(df, selected_columns, cmap='bwr', figsize=(10, 10)):
 Bias Analysis
 """
 
-def get_sector_metric(sector, df):
-    """
-    Calculate disparity metrics for candidates in a given job sector.
-
-    Parameters:
-    - sector: The job sector to analyze.
-    - df: A DataFrame containing candidate and job information.
-
-    Returns:
-    - A DataFrame with columns ['Sector', 'Job', 'Disparate_Impact', 'Statistical_Parity_Difference']
-      containing the disparity metrics for each job in the sector.
-    """
+def get_sector_metric(df, sector_column, sector, protected_attribute):
     # Ensure the sector exists in the DataFrame to avoid empty results
-    if sector not in df['job_sector'].unique():
+    if sector not in df[sector_column].unique():
         raise ValueError(f"Sector '{sector}' not found in the DataFrame.")
     
     # Retrieve unique job IDs for the specified sector
-    job_list = df[df["job_sector"] == sector]['job_id'].unique()
+    job_list = df[df[sector_column] == sector]['job_id'].unique()
     job_info_list = []
 
     for job in job_list:
@@ -176,7 +165,7 @@ def get_sector_metric(sector, df):
                                   'job_contract_type', 'job_professional_category', 
                                   'job_sector', 'job_work_province', 'cand_id', 
                                   'cand_domicile_province', 'cand_domicile_region', 
-                                  'cand_education', 'cand_languages_spoken'])
+                                  'cand_education'])
 
         # Prepare dataset for AIF360 analysis
         binaryLabelDataset = BinaryLabelDataset(
@@ -184,14 +173,14 @@ def get_sector_metric(sector, df):
             unfavorable_label=0,
             df=job_df,
             label_names=['idoneous'],
-            protected_attribute_names=['cand_gender']
+            protected_attribute_names=[protected_attribute]
         )
 
         # Calculate metrics
         metric_orig = BinaryLabelDatasetMetric(
             binaryLabelDataset,
-            unprivileged_groups=[{"cand_gender": 0}],
-            privileged_groups=[{"cand_gender": 1}]
+            privileged_groups=[{protected_attribute: 1}],
+            unprivileged_groups=[{protected_attribute: 0}],
         )
 
         job_info = [sector, job, metric_orig.disparate_impact(), metric_orig.statistical_parity_difference()]
@@ -199,3 +188,59 @@ def get_sector_metric(sector, df):
 
     columns = ['Sector', 'Job', 'Disparate_Impact', 'Statistical_Parity_Difference']
     return pd.DataFrame(job_info_list, columns=columns)
+
+def get_sector_metric_optimized(df, sector_column, sector, protected_attribute):
+    # Ensure the sector exists in the DataFrame to avoid empty results
+    if sector not in df[sector_column].unique():
+        raise ValueError(f"Sector '{sector}' not found in the DataFrame.")
+    
+    # Pre-filter DataFrame for the sector
+    sector_df = df[df[sector_column] == sector]
+    
+    # Retrieve unique job IDs for the specified sector
+    job_list = sector_df['job_id'].unique()
+    job_info_list = []
+
+    for job in job_list:
+        # Identify idoneous candidates directly without splitting and concatenating DataFrames
+        job_df = sector_df.copy()
+        job_df['idoneous'] = (job_df['job_id'] == job).astype(int)
+
+        # Drop unnecessary columns
+        job_df = job_df.drop(columns=['job_id', 'distance_km', 'match_score', 'match_rank', 
+                                      'job_contract_type', 'job_professional_category', 
+                                      'job_sector', 'job_work_province', 'cand_id', 
+                                      'cand_domicile_province', 'cand_domicile_region', 
+                                      'cand_education'])
+
+        # Prepare dataset for AIF360 analysis
+        binaryLabelDataset = BinaryLabelDataset(
+            favorable_label=1,
+            unfavorable_label=0,
+            df=job_df,
+            label_names=['idoneous'],
+            protected_attribute_names=[protected_attribute]
+        )
+
+        # Calculate metrics
+        metric_orig = BinaryLabelDatasetMetric(
+            binaryLabelDataset,
+            privileged_groups=[{protected_attribute: 1}],
+            unprivileged_groups=[{protected_attribute: 0}],
+        )
+
+        job_info = [sector, job, metric_orig.disparate_impact(), metric_orig.statistical_parity_difference()]
+        job_info_list.append(job_info)
+
+    columns = ['Sector', 'Job', 'Disparate_Impact', 'Statistical_Parity_Difference']
+    return pd.DataFrame(job_info_list, columns=columns)
+
+def get_all_sectors_metrics(df, sector_column = 'job_sector', protected_attribute = 'cand_gender'):
+    sectors = df[sector_column].unique()
+    all_sector_metrics = pd.DataFrame(columns=['Sector', 'Job', 'Disparate_Impact', 'Statistical_Parity_Difference'])
+
+    for sector in sectors:
+        sector_metrics = get_sector_metric(df, sector_column, sector, protected_attribute)
+        all_sector_metrics = pd.concat([all_sector_metrics, sector_metrics], axis=0)
+
+    return all_sector_metrics
