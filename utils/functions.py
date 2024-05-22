@@ -53,13 +53,24 @@ def transform_cand_languages_spoken(df):
         df[lang] = df['cand_languages_spoken'].apply(lambda x: 1 if lang in x else 0)
     df = df.drop(columns=['cand_languages_spoken'])
     return df
-
+    
+def transform_provinces(df):
+    column_name1,column_name2 = "job_contract_type", "job_sector"
+    df[column_name1] = df[column_name1].str.strip()
+    df[column_name2] = df[column_name2].str.strip()
+    unique_values = sorted(list(set(df[column_name1].unique()) | set(df[column_name2].unique())), key=lambda x: str(x))
+    provinces_encoding  = dict(zip(unique_values, range(len(unique_values))))
+    df[column_name1] = df[column_name1].replace(provinces_encoding)
+    df[column_name2] = df[column_name2].replace(provinces_encoding)
+    return df
+    
 def process_full_dataset(df):
     df_processed = df.copy()
     df_processed = transform_cand_id(df_processed)
     df_processed = transform_cand_gender(df_processed)
     df_processed = transform_cand_age_bucket(df_processed)
-    for column in ["cand_domicile_province", "cand_domicile_region", "job_contract_type", "job_sector", "job_work_province"]:
+    df_processed = transform_provinces(df_processed)
+    for column in ["cand_domicile_region", "job_contract_type", "job_sector"]:
         df_processed, _ = transform_categorical_column(df_processed, column)
     df_processed = transform_cand_education(df_processed)
     df_processed = transform_cand_languages_spoken(df_processed)
