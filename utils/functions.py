@@ -140,32 +140,83 @@ def plot_correlation_matrix(df, selected_columns, cmap='bwr', figsize=(10, 10)):
 Bias Analysis
 """
 
-def get_sector_metric(df, sector_column, sector, protected_attribute):
+def get_sector_metric(df,sector,column_to_test, protected_attribute_value):
+    # Ensure the sector exists in the DataFrame to avoid empty results
+    if column_to_test not in df.columns:
+        raise ValueError(f"column_to_test '{column_to_test}' not found in the DataFrame.")
+    if protected_attribute_value not in df[column_to_test].unique():
+        raise ValueError(f"Protected_attribute_value '{protected_attribute_value}' not found in the DataFrame.")
+    if sector not in df['job_sector'].unique():
+        raise ValueError(f"Sector '{sector}' not found in the DataFrame.")
+    
+    # Pre-filter DataFrame for the sector
+    sector_df = df[df['job_sector'] == sector]
+    
+    # Retrieve unique job IDs for the specified sector
+    job_list = sector_df['job_id'].unique()
+    job_info_list = []
+
+    for job in job_list:
+        # Identify idoneous candidates directly without splitting and concatenating DataFrames
+        job_df = sector_df.copy()
+        
+        #job_df['idoneous'] = (job_df['job_id'] == job).astype(int)
+        idoneous_vec = (job_df['job_id'] == job).astype(int)
+        job_df['idoneous'] = idoneous_vec
+        job_df = job_df.sort_values(by=['idoneous']).drop_duplicates(subset=['cand_id'], keep='first')
+
+        job_df[column_to_test] = (job_df[column_to_test] == protected_attribute_value).astype(int)
+
+        job_df = job_df.drop(columns=['job_id', 'distance_km', 'match_score', 'match_rank', 
+                              'job_contract_type', 'job_professional_category', 
+                              'job_sector','cand_id']) 
+                              #job_work_province,'cand_domicile_province', 'cand_education'])
+        
+        # Prepare dataset for AIF360 analysis
+        binaryLabelDataset = BinaryLabelDataset(
+            favorable_label=1,
+            unfavorable_label=0,
+            df=job_df,
+            label_names=['idoneous'],
+            protected_attribute_names=[column_to_test]
+        )
+
+        # Calculate metrics
+        metric_orig = BinaryLabelDatasetMetric(
+            binaryLabelDataset,
+            privileged_groups=[{column_to_test: 1}],
+            unprivileged_groups=[{column_to_test: 0}],
+        )
+
+        job_info = [sector, job, metric_orig.disparate_impact(), metric_orig.statistical_parity_difference()]
+        job_info_list.append(job_info)
+
+    columns = ['Sector', 'Job', 'Disparate_Impact', 'Statistical_Parity_Difference']
+    return pd.DataFrame(job_info_list, columns=columns)
+  
+def get_sector_metric_optimized(df, sector_column, sector, protected_attribute):
     # Ensure the sector exists in the DataFrame to avoid empty results
     if sector not in df[sector_column].unique():
         raise ValueError(f"Sector '{sector}' not found in the DataFrame.")
     
+    # Pre-filter DataFrame for the sector
+    sector_df = df[df[sector_column] == sector]
+    
     # Retrieve unique job IDs for the specified sector
-    job_list = df[df[sector_column] == sector]['job_id'].unique()
+    job_list = sector_df['job_id'].unique()
     job_info_list = []
 
     for job in job_list:
-        # Split DataFrame into idoneous and other candidates based on job_id
-        idoneus_candidates_df = df[df["job_id"] == job].copy()
-        other_candidates_df = df[df["job_id"] != job].copy()
+        # Identify idoneous candidates directly without splitting and concatenating DataFrames
+        job_df = sector_df.copy()
+        job_df['idoneous'] = (job_df['job_id'] == job).astype(int)
 
-        # Mark candidates as idoneous or not
-        idoneus_candidates_df['idoneous'] = 1
-        other_candidates_df['idoneous'] = 0
-
-        # Combine and clean up the DataFrame
-        job_df = pd.concat([idoneus_candidates_df, other_candidates_df], axis=0) \
-                   .drop_duplicates(subset=['cand_id'], keep='first') \
-                   .drop(columns=['job_id', 'distance_km', 'match_score', 'match_rank', 
-                                  'job_contract_type', 'job_professional_category', 
-                                  'job_sector', 'job_work_province', 'cand_id', 
-                                  'cand_domicile_province', 'cand_domicile_region', 
-                                  'cand_education'])
+        # Drop unnecessary columns
+        job_df = job_df.drop(columns=['job_id', 'distance_km', 'match_score', 'match_rank', 
+                                      'job_contract_type', 'job_professional_category', 
+                                      'job_sector', 'job_work_province', 'cand_id', 
+                                      'cand_domicile_province', 'cand_domicile_region', 
+                                      'cand_education'])
 
         # Prepare dataset for AIF360 analysis
         binaryLabelDataset = BinaryLabelDataset(
@@ -188,46 +239,6 @@ def get_sector_metric(df, sector_column, sector, protected_attribute):
 
     columns = ['Sector', 'Job', 'Disparate_Impact', 'Statistical_Parity_Difference']
     return pd.DataFrame(job_info_list, columns=columns)
-
-def get_sector_metric(sector,df,column_name, protected_attribute_value):   
-  if column_name not in df.columns or protected_attribute_value not in df[column_name].unique():
-    print('Invalid column name or value')
-    return
-  #Retrieve candidates for a specific job
-  job_list = df[(df["job_sector"] == sector)].job_id.unique()
-  job_info_list = []
-  for job in job_list:
-    idoneus_candidates_df = df[df["job_id"] == job].copy()#df[(df["job_sector"] == sector) & (df["job_id"] == job)]
-    other_candidates_df = df[df["job_id"] != job].copy()
-
-    idoneus_candidates_df['idoneous'] = 1
-    other_candidates_df['idoneous'] = 0
-
-    #job_work_province = idoneus_candidates_df.iloc[0].job_work_province #save province if we want to inspect them later
-
-    job_df = pd.concat([idoneus_candidates_df, other_candidates_df], axis=0).drop_duplicates(subset=['cand_id'],keep='first').drop(columns=['job_id','distance_km', 'match_score','match_rank','job_contract_type','job_professional_category','job_sector','job_work_province'])
-    #just to test aif360
-    job_df = job_df.drop(columns=['cand_id','cand_domicile_province','cand_domicile_region','cand_education'])
-    ##### AIF360 here we need to check all the different biases ########
-    job_df[column_name] = (job_df[column_name] == protected_attribute_value).astype(int)
-    binaryLabelDataset = BinaryLabelDataset(
-      favorable_label=1,
-      unfavorable_label=0,
-      df=job_df,
-      label_names=['idoneous'],
-      protected_attribute_names=[column_name])
-    
-    metric_orig = BinaryLabelDatasetMetric(
-      binaryLabelDataset,
-      unprivileged_groups=[{column_name: 0}],
-      privileged_groups=[{column_name: 1}],
-    )
-
-    job_info = [sector, job, metric_orig.disparate_impact(),metric_orig.statistical_parity_difference()]
-    job_info_list.append(job_info)
-
-  columns = ['Sector', 'Job', 'Disparate_Impact', 'Statistical_Parity_Difference']
-  return pd.DataFrame(job_info_list, columns=columns)
 
 def get_all_sectors_metrics(df, sector_column = 'job_sector', protected_attribute = 'cand_gender'):
     sectors = df[sector_column].unique()
