@@ -55,7 +55,7 @@ def transform_cand_languages_spoken(df):
     return df
     
 def transform_provinces(df):
-    column_name1,column_name2 = "job_contract_type", "job_sector"
+    column_name1,column_name2 = 'cand_domicile_province', 'job_work_province'
     df[column_name1] = df[column_name1].str.strip()
     df[column_name2] = df[column_name2].str.strip()
     unique_values = sorted(list(set(df[column_name1].unique()) | set(df[column_name2].unique())), key=lambda x: str(x))
@@ -205,6 +205,15 @@ def get_sector_metric(df,sector,column_to_test, protected_attribute_value):
     columns = ['Sector', 'Job', 'Disparate_Impact', 'Statistical_Parity_Difference']
     return pd.DataFrame(job_info_list, columns=columns)
   
+def test_bias(df, column_to_test, protected_attribute_value):
+    sectors = df['job_sector'].unique()
+    all_sector_metrics = pd.DataFrame(columns=['Sector', 'Job', 'Disparate_Impact', 'Statistical_Parity_Difference'])
+
+    for sector in sectors:
+        sector_metrics = get_sector_metric(df, sector, column_to_test, protected_attribute_value)
+        all_sector_metrics = pd.concat([all_sector_metrics, sector_metrics], axis=0)
+    return all_sector_metrics
+###################################################################################################################
 def get_sector_metric_optimized(df, sector_column, sector, protected_attribute):
     # Ensure the sector exists in the DataFrame to avoid empty results
     if sector not in df[sector_column].unique():
