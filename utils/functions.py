@@ -174,7 +174,7 @@ def get_sector_metric(df,sector,column_to_test, protected_attribute_value):
         #job_df['idoneous'] = (job_df['job_id'] == job).astype(int)
         idoneous_vec = (job_df['job_id'] == job).astype(int)
         job_df['idoneous'] = idoneous_vec
-        job_df = job_df.sort_values(by=['idoneous']).drop_duplicates(subset=['cand_id'], keep='first')
+        job_df = job_df.sort_values(by=['idoneous'],ascending=False).drop_duplicates(subset=['cand_id'], keep='first')
 
         job_df[column_to_test] = (job_df[column_to_test] == protected_attribute_value).astype(int)
 
