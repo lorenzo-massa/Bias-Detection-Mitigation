@@ -178,6 +178,13 @@ def get_sector_metric(df,sector,column_to_test, protected_attribute_value):
 
         job_df[column_to_test] = (job_df[column_to_test] == protected_attribute_value).astype(int)
 
+        if job_df[(job_df['idoneous']==1) & (job_df[column_to_test]==protected_attribute_value)].shape[0] == 0:
+          candidate_to_replicate = job_df[job_df['idoneous'] == 1].iloc[0].copy()
+          candidate_to_replicate[column_to_test] = protected_attribute_value
+          #job_df = job_df.append(candidate_to_replicate, ignore_index=True) 
+          job_df.loc[-1] = candidate_to_replicate
+
+
         job_df = job_df.drop(columns=['job_id', 'distance_km', 'match_score', 'match_rank', 
                               'job_contract_type', 'job_professional_category', 
                               'job_sector','cand_id']) 
