@@ -64,8 +64,87 @@ def transform_provinces(df):
     df[column_name2] = df[column_name2].replace(provinces_encoding)
     return df
     
-def process_full_dataset(df):
+def transform_to_macrosectors(df, dataset_name):
+    if "direct" in dataset_name:
+        macro_sectors_dir = {
+            "Ambiente / Energie Rinnovabili": "Ambiente, Ingegneria e Ricerca",
+            "Ingegneria / Ricerca e Sviluppo / Laboratorio": "Ambiente, Ingegneria e Ricerca",
+            "Ingegneria Impiantistica": "Ambiente, Ingegneria e Ricerca",
+            "Installazione / Impiantistica / Cantieristica": "Ambiente, Ingegneria e Ricerca",
+            "Progettisti / Design / Grafici": "Ambiente, Ingegneria e Ricerca",
+            "Assistenziale / Paramedico / Tecnico": "Assistenziale e Paramedico",
+            "Scientifico / Farmaceutico": "Assistenziale e Paramedico",
+            "Banche / Assicurazioni / Istituti di Credito": "Banche e Finanza",
+            "Finanza / Contabilità": "Banche e Finanza",
+            "Bar / Catering / Personale Di Sala / Cuochi / Chef": "Ristorazione, Alberghiero e Spettacolo",
+            "Personale Per Hotel / Piani / Reception / Back Office": "Ristorazione, Alberghiero e Spettacolo",
+            "Estetisti / Cure del Corpo": "Ristorazione, Alberghiero e Spettacolo",
+            "Moda / Spettacolo / Eventi": "Ristorazione, Alberghiero e Spettacolo",
+            "Call Center / Customer Care": "Call Center e Vendita",
+            "Commerciale / Vendita": "Call Center e Vendita",
+            "Management / Responsabili / Supervisori": "Management e Supervisori",
+            "Risorse Umane / Recruitment": "Management e Supervisori",
+            "Segreteria / Servizi Generali": "Management e Supervisori",
+            "Help Desk / Assistenza Informatica": "Management e Supervisori",
+            "Manutenzione / Riparazione": "Logistica e Manutenzione",
+            "Magazzino / Logistica / Trasporti": "Logistica e Manutenzione",
+            "Personale Aeroportuale": "Logistica e Manutenzione",
+            "GDO / Retail / Commessi / Scaffalisti": "Impiegati",
+            "Operai Generici": "Operai Generici",
+            "Operai Specializzati": "Operai Specializzati",
+        }
+    elif "reverse" in dataset_name:
+        macro_sectors_dir = {
+            "Ambiente / Energie Rinnovabili": "Ambiente, Ingegneria e Ricerca",
+            "Ingegneria / Ricerca e Sviluppo / Laboratorio": "Ambiente, Ingegneria e Ricerca",
+            "Ingegneria Impiantistica": "Ambiente, Ingegneria e Ricerca",
+            "Installazione / Impiantistica / Cantieristica": "Ambiente, Ingegneria e Ricerca",
+            "Progettisti / Design / Grafici": "Ambiente, Ingegneria e Ricerca",
+            "Assistenziale / Paramedico / Tecnico": "Assistenziale e Paramedico",
+            "Scientifico / Farmaceutico": "Assistenziale e Paramedico",
+            "Medico": "Assistenziale e Paramedico",
+            "Banche / Assicurazioni / Istituti di Credito": "Banche e Finanza",
+            "Finanza / Contabilità": "Banche e Finanza",
+            "Bar / Catering / Personale Di Sala / Cuochi / Chef": "Ristorazione, Alberghiero e Spettacolo",
+            "Personale Per Hotel / Piani / Reception / Back Office": "Ristorazione, Alberghiero e Spettacolo",
+            "Estetisti / Cure del Corpo": "Ristorazione, Alberghiero e Spettacolo",
+            "Moda / Spettacolo / Eventi": "Ristorazione, Alberghiero e Spettacolo",
+            "Ristorazione E Hotel Management": "Ristorazione, Alberghiero e Spettacolo",
+            "Turismo / Tour Operator / Agenzie Di Viaggio": "Ristorazione, Alberghiero e Spettacolo",
+            "Call Center / Customer Care": "Call Center e Vendita",
+            "Commerciale / Vendita": "Call Center e Vendita",
+            "Management / Responsabili / Supervisori": "Management e Supervisori",
+            "Risorse Umane / Recruitment": "Management e Supervisori",
+            "Segreteria / Servizi Generali": "Management e Supervisori",
+            "Help Desk / Assistenza Informatica": "Management e Supervisori",
+            "Manutenzione / Riparazione": "Logistica e Manutenzione",
+            "Magazzino / Logistica / Trasporti": "Logistica e Manutenzione",
+            "Personale Aeroportuale": "Logistica e Manutenzione",
+            "Operai Generici": "Operai Generici",
+            "Operai Specializzati": "Operai Specializzati",
+            "Analisi / Sviluppo Software / Web": "Sviluppo Software e IT",
+            "IT Management / Pre-Sales / Post-Sales": "Sviluppo Software e IT",
+            "Infrastruttura IT / DBA": "Sviluppo Software e IT",
+            "Polizia / Vigili Urbani / Pubblica Sicurezza": "Vigilanza e Sicurezza",
+            "Vigilanza / Sicurezza / Guardie Giurate": "Vigilanza e Sicurezza",
+            "GDO / Retail / Commessi / Scaffalisti": "Impiegati e professionisti",
+            "Impiegati": "Impiegati e professionisti",
+            "Professioni Agricoltura / Pesca": "Impiegati e professionisti",
+            "Professioni Artigiane": "Impiegati e professionisti",
+            "Servizi Professionali": "Formazione",
+            "Formazione / Istruzione / Educatori Professionali": "Formazione",
+            "Affari Legali / Avvocati": "Amministrazione",
+            "Amministrazione Pubblica": "Amministrazione",
+        }
+    else:
+        raise ValueError("Invalid dataset name. Please provide a valid dataset name. (direct or reverse)")
+        
+    df['job_sector'] = df['job_sector'].replace(macro_sectors_dir)
+    return df
+
+def process_full_dataset(df, dataset_name):
     df_processed = df.copy()
+    df_processed = transform_to_macrosectors(df_processed, dataset_name)
     df_processed = transform_cand_id(df_processed)
     df_processed = transform_cand_gender(df_processed)
     df_processed = transform_cand_age_bucket(df_processed)
@@ -272,7 +351,7 @@ def get_all_sectors_metrics(df, sector_column = 'job_sector', protected_attribut
     all_sector_metrics = pd.DataFrame(columns=['Sector', 'Job', 'Disparate_Impact', 'Statistical_Parity_Difference'])
 
     for sector in sectors:
-        sector_metrics = get_sector_metric(df, sector_column, sector, protected_attribute)
+        sector_metrics = get_sector_metric_optimized(df, sector_column, sector, protected_attribute)
         all_sector_metrics = pd.concat([all_sector_metrics, sector_metrics], axis=0)
 
     return all_sector_metrics
