@@ -276,3 +276,15 @@ def get_all_sectors_metrics(df, sector_column = 'job_sector', protected_attribut
         all_sector_metrics = pd.concat([all_sector_metrics, sector_metrics], axis=0)
 
     return all_sector_metrics
+
+def show_bias(df, column, value):
+
+    if column == "same_location":
+        df["same_location"] = (
+            df["cand_domicile_province"] == df["job_work_province"]
+        ).astype(int)
+
+    all_sector_metrics = test_bias(df, column, value)
+
+    print(all_sector_metrics.drop(["Job"], axis=1).groupby(["Sector"]).mean())
+    print(all_sector_metrics.drop(["Job"], axis=1).groupby(["Sector"]).max())
