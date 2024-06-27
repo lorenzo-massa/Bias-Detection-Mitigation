@@ -1,0 +1,12 @@
+{
+    "Ambiente, Ingegneria e Ricerca": 0,
+    "Assistenziale e Paramedico": 1,
+    "Banche e Finanza": 2,
+    "Call Center e Vendita": 3,
+    "Impiegati": 4,
+    "Logistica e Manutenzione": 5,
+    "Management e Supervisori": 6,
+    "Operai Generici": 7,
+    "Operai Specializzati": 8,
+    "Ristorazione, Alberghiero e Spettacolo": 9
+}

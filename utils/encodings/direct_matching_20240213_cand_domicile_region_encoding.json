@@ -1,0 +1,20 @@
+{
+    "ABRUZZO": 0,
+    "CALABRIA": 1,
+    "CAMPANIA": 2,
+    "EMILIA ROMAGNA": 3,
+    "FRIULI VENEZIA GIULIA": 4,
+    "LAZIO": 5,
+    "LIGURIA": 6,
+    "LOMBARDIA": 7,
+    "MARCHE": 8,
+    "MOLISE": 9,
+    "PIEMONTE": 10,
+    "PUGLIA": 11,
+    "SARDEGNA": 12,
+    "TOSCANA": 13,
+    "TRENTINO ALTO ADIGE": 14,
+    "UMBRIA": 15,
+    "VALLE D'AOSTA": 16,
+    "VENETO": 17
+}
