@@ -9,6 +9,14 @@ import matplotlib.pyplot as plt
 from aif360.datasets import BinaryLabelDataset
 from aif360.metrics import BinaryLabelDatasetMetric
 
+DEFAULT_COLS = [
+    "Sector",
+    "Job",
+    "Disparate_Impact",
+    "Statistical_Parity_Difference",
+    "DIDI",
+]
+
 """
 Data Preprocessing
 """
@@ -399,23 +407,25 @@ def get_sector_metric(
             unprivileged_groups=[{protected_attr_col: 0}],
         )
 
+        # Compute DIDI
+        DIDI_metric = DIDI_r(job_df, job_df["idoneous"], {protected_attr_col: [1]})
+
+        # Store the result
         job_info = [
             sector,
             job,
             metric_orig.disparate_impact(),
             metric_orig.statistical_parity_difference(),
+            DIDI_metric,
         ]
         job_info_list.append(job_info)
 
-    columns = ["Sector", "Job", "Disparate_Impact", "Statistical_Parity_Difference"]
-    return pd.DataFrame(job_info_list, columns=columns)
+    return pd.DataFrame(job_info_list, columns=DEFAULT_COLS)
 
 
 def test_bias(df, protected_attr_col, attr_favorable_value):
     sectors = df["job_sector"].unique()
-    all_sector_metrics = pd.DataFrame(
-        columns=["Sector", "Job", "Disparate_Impact", "Statistical_Parity_Difference"]
-    )
+    all_sector_metrics = pd.DataFrame(columns=DEFAULT_COLS)
 
     for sector in sectors:
         sector_metrics = get_sector_metric(
@@ -424,35 +434,47 @@ def test_bias(df, protected_attr_col, attr_favorable_value):
         all_sector_metrics = pd.concat([all_sector_metrics, sector_metrics], axis=0)
     return all_sector_metrics
 
+
 def get_all_sectors_metrics(
     df, sector_column="job_sector", protected_attribute="cand_gender"
 ):
     sectors = df[sector_column].unique()
-    all_sector_metrics = pd.DataFrame(
-        columns=["Sector", "Job", "Disparate_Impact", "Statistical_Parity_Difference"]
-    )
+    all_sector_metrics = pd.DataFrame(columns=DEFAULT_COLS)
 
     for sector in sectors:
         sector_metrics = get_sector_metric(
-            df, sector, protected_attr_col=protected_attribute, sector_column=sector_column
+            df,
+            sector,
+            protected_attr_col=protected_attribute,
+            sector_column=sector_column,
         )
         all_sector_metrics = pd.concat([all_sector_metrics, sector_metrics], axis=0)
 
     return all_sector_metrics
 
+
 ###################################################################################################################
 
 
+# Function to compute DIDI
+def DIDI_r(data, pred, protected):
+    res, avg = 0, np.mean(pred)
+    for aname, dom in protected.items():
+        for val in dom:
+            mask = data[aname] == val
+            res += abs(avg - np.mean(pred[mask]))
+    return res
 
 
-def show_bias(df, column, value):
+def show_bias(df, protected_attr_col, attr_favorable_value):
 
-    if column == "same_location":
+    # Add a column to check if the candidate and the job are in the same location
+    if protected_attr_col == "same_location":
         df["same_location"] = (
             df["cand_domicile_province"] == df["job_work_province"]
         ).astype(int)
 
-    all_sector_metrics = test_bias(df, column, value)
+    all_sector_metrics = test_bias(df, protected_attr_col, attr_favorable_value)
 
     # print("Mean values:")
     # print(all_sector_metrics.drop(["Job"], axis=1).groupby(["Sector"]).mean())
