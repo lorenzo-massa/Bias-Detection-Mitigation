@@ -291,112 +291,39 @@ Bias Analysis
 """
 
 
-def get_sector_metric(df, sector, column_to_test, protected_attribute_value):
-    # Ensure the sector exists in the DataFrame to avoid empty results
-    if column_to_test not in df.columns:
+def get_sector_metric(
+    df: pd.DataFrame,
+    sector: int,
+    protected_attr_col: str = "cand_gender",
+    attr_favorable_value: int = 1,
+    sector_column="job_sector",
+):
+    """
+    Calculate fairness metrics for each job in a sector.
+
+    Parameters:
+    - df: DataFrame to analyze.
+    - sector: Sector to analyze.
+    - protected_attr_col: Protected attribute column name.
+    - attr_favorable_value: Protected attribute value.
+    - sector_column: Sector column name.
+
+    Returns:
+    - DataFrame containing fairness metrics for each job in the sector.
+    """
+    # Ensure the column exists in the DataFrame
+    if protected_attr_col not in df.columns:
         raise ValueError(
-            f"column_to_test '{column_to_test}' not found in the DataFrame."
+            f"protected_attr_col '{protected_attr_col}' not found in the DataFrame."
         )
-    if protected_attribute_value not in df[column_to_test].unique():
+
+    # Ensure the protected attribute value exists in the DataFrame
+    if attr_favorable_value not in df[protected_attr_col].unique():
         raise ValueError(
-            f"Protected_attribute_value '{protected_attribute_value}' not found in the DataFrame."
-        )
-    if sector not in df["job_sector"].unique():
-        raise ValueError(f"Sector '{sector}' not found in the DataFrame.")
-
-    # Pre-filter DataFrame for the sector
-    sector_df = df[df["job_sector"] == sector]
-
-    # Retrieve unique job IDs for the specified sector
-    job_list = sector_df["job_id"].unique()
-    job_info_list = []
-
-    for job in job_list:
-        # Identify idoneous candidates directly without splitting and concatenating DataFrames
-        job_df = sector_df.copy()
-
-        # job_df['idoneous'] = (job_df['job_id'] == job).astype(int)
-        idoneous_vec = (job_df["job_id"] == job).astype(int)
-        job_df["idoneous"] = idoneous_vec
-        job_df = job_df.sort_values(by=["idoneous"], ascending=False).drop_duplicates(
-            subset=["cand_id"], keep="first"
+            f"attr_favorable_value '{attr_favorable_value}' not found in the DataFrame."
         )
 
-        job_df[column_to_test] = (
-            job_df[column_to_test] == protected_attribute_value
-        ).astype(int)
-
-        if (
-            job_df[
-                (job_df["idoneous"] == 1)
-                & (job_df[column_to_test] == protected_attribute_value)
-            ].shape[0]
-            == 0
-        ):
-            candidate_to_replicate = job_df[job_df["idoneous"] == 1].iloc[0].copy()
-            candidate_to_replicate[column_to_test] = protected_attribute_value
-            # job_df = job_df.append(candidate_to_replicate, ignore_index=True)
-            job_df.loc[-1] = candidate_to_replicate
-
-        job_df = job_df.drop(
-            columns=[
-                "job_id",
-                "distance_km",
-                "match_score",
-                "match_rank",
-                "job_contract_type",
-                "job_professional_category",
-                "job_sector",
-                "cand_id",
-            ]
-        )
-        # job_work_province,'cand_domicile_province', 'cand_education'])
-
-        # Prepare dataset for AIF360 analysis
-        binaryLabelDataset = BinaryLabelDataset(
-            favorable_label=1,
-            unfavorable_label=0,
-            df=job_df,
-            label_names=["idoneous"],
-            protected_attribute_names=[column_to_test],
-        )
-
-        # Calculate metrics
-        metric_orig = BinaryLabelDatasetMetric(
-            binaryLabelDataset,
-            privileged_groups=[{column_to_test: 1}],
-            unprivileged_groups=[{column_to_test: 0}],
-        )
-
-        job_info = [
-            sector,
-            job,
-            metric_orig.disparate_impact(),
-            metric_orig.statistical_parity_difference(),
-        ]
-        job_info_list.append(job_info)
-
-    columns = ["Sector", "Job", "Disparate_Impact", "Statistical_Parity_Difference"]
-    return pd.DataFrame(job_info_list, columns=columns)
-
-
-def test_bias(df, column_to_test, protected_attribute_value):
-    sectors = df["job_sector"].unique()
-    all_sector_metrics = pd.DataFrame(
-        columns=["Sector", "Job", "Disparate_Impact", "Statistical_Parity_Difference"]
-    )
-
-    for sector in sectors:
-        sector_metrics = get_sector_metric(
-            df, sector, column_to_test, protected_attribute_value
-        )
-        all_sector_metrics = pd.concat([all_sector_metrics, sector_metrics], axis=0)
-    return all_sector_metrics
-
-
-###################################################################################################################
-def get_sector_metric_optimized(df, sector_column, sector, protected_attribute):
-    # Ensure the sector exists in the DataFrame to avoid empty results
+    # Ensure the sector exists in the DataFrame
     if sector not in df[sector_column].unique():
         raise ValueError(f"Sector '{sector}' not found in the DataFrame.")
 
@@ -410,9 +337,35 @@ def get_sector_metric_optimized(df, sector_column, sector, protected_attribute):
     for job in job_list:
         # Identify idoneous candidates directly without splitting and concatenating DataFrames
         job_df = sector_df.copy()
+
+        # Add idoneous column
         job_df["idoneous"] = (job_df["job_id"] == job).astype(int)
 
-        # Drop unnecessary columns
+        # Drop duplicated candidates, keeping only the first one
+        job_df = job_df.sort_values(by=["idoneous"], ascending=False).drop_duplicates(
+            subset=["cand_id"], keep="first"
+        )
+
+        # Transform the protected attribute value to binary
+        job_df[protected_attr_col] = (
+            job_df[protected_attr_col] == attr_favorable_value
+        ).astype(int)
+
+        # If there are no idoneous candidates with the specified protected attribute value, replicate one
+        if (
+            job_df[
+                (job_df["idoneous"] == 1)
+                & (job_df[protected_attr_col] == attr_favorable_value)
+            ].shape[0]
+            == 0
+        ):
+            # Get the first idoneous candidate and replicate it with the specified protected attribute value
+            candidate_to_replicate = job_df[job_df["idoneous"] == 1].iloc[0].copy()
+            candidate_to_replicate[protected_attr_col] = attr_favorable_value
+
+            # Append the replicated candidate to the DataFrame
+            job_df.loc[-1] = candidate_to_replicate
+
         job_df = job_df.drop(
             columns=[
                 "job_id",
@@ -436,14 +389,14 @@ def get_sector_metric_optimized(df, sector_column, sector, protected_attribute):
             unfavorable_label=0,
             df=job_df,
             label_names=["idoneous"],
-            protected_attribute_names=[protected_attribute],
+            protected_attribute_names=[protected_attr_col],
         )
 
         # Calculate metrics
         metric_orig = BinaryLabelDatasetMetric(
             binaryLabelDataset,
-            privileged_groups=[{protected_attribute: 1}],
-            unprivileged_groups=[{protected_attribute: 0}],
+            privileged_groups=[{protected_attr_col: 1}],
+            unprivileged_groups=[{protected_attr_col: 0}],
         )
 
         job_info = [
@@ -458,6 +411,19 @@ def get_sector_metric_optimized(df, sector_column, sector, protected_attribute):
     return pd.DataFrame(job_info_list, columns=columns)
 
 
+def test_bias(df, protected_attr_col, attr_favorable_value):
+    sectors = df["job_sector"].unique()
+    all_sector_metrics = pd.DataFrame(
+        columns=["Sector", "Job", "Disparate_Impact", "Statistical_Parity_Difference"]
+    )
+
+    for sector in sectors:
+        sector_metrics = get_sector_metric(
+            df, sector, protected_attr_col, attr_favorable_value
+        )
+        all_sector_metrics = pd.concat([all_sector_metrics, sector_metrics], axis=0)
+    return all_sector_metrics
+
 def get_all_sectors_metrics(
     df, sector_column="job_sector", protected_attribute="cand_gender"
 ):
@@ -467,12 +433,16 @@ def get_all_sectors_metrics(
     )
 
     for sector in sectors:
-        sector_metrics = get_sector_metric_optimized(
-            df, sector_column, sector, protected_attribute
+        sector_metrics = get_sector_metric(
+            df, sector, protected_attr_col=protected_attribute, sector_column=sector_column
         )
         all_sector_metrics = pd.concat([all_sector_metrics, sector_metrics], axis=0)
 
     return all_sector_metrics
+
+###################################################################################################################
+
+
 
 
 def show_bias(df, column, value):
@@ -484,5 +454,9 @@ def show_bias(df, column, value):
 
     all_sector_metrics = test_bias(df, column, value)
 
-    print(all_sector_metrics.drop(["Job"], axis=1).groupby(["Sector"]).mean())
-    print(all_sector_metrics.drop(["Job"], axis=1).groupby(["Sector"]).max())
+    # print("Mean values:")
+    # print(all_sector_metrics.drop(["Job"], axis=1).groupby(["Sector"]).mean())
+    # print("Max values:")
+    # print(all_sector_metrics.drop(["Job"], axis=1).groupby(["Sector"]).max())
+
+    return all_sector_metrics.groupby("Sector").describe()
