@@ -475,10 +475,9 @@ def show_bias(df, protected_attr_col, attr_favorable_value):
         ).astype(int)
 
     all_sector_metrics = test_bias(df, protected_attr_col, attr_favorable_value)
+    all_sector_metrics =  all_sector_metrics.groupby("Sector").describe()
 
-    # print("Mean values:")
-    # print(all_sector_metrics.drop(["Job"], axis=1).groupby(["Sector"]).mean())
-    # print("Max values:")
-    # print(all_sector_metrics.drop(["Job"], axis=1).groupby(["Sector"]).max())
+    # Save the results
+    all_sector_metrics.to_csv("Results/bias_analysis_" + protected_attr_col + ".csv")
 
-    return all_sector_metrics.groupby("Sector").describe()
+    return all_sector_metrics
