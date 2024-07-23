@@ -356,24 +356,21 @@ def get_sector_metric(
 
         # Transform the protected attribute value to binary
         job_df[protected_attr_col] = (
-            job_df[protected_attr_col] == attr_favorable_value
+            job_df[protected_attr_col] == attr_favorable_value # 1 if the candidate has the favorable attribute value
         ).astype(int)
 
         # If there are no idoneous candidates with the specified protected attribute value, replicate one
         if (
-            job_df[
-                (job_df["idoneous"] == 1)
-                & (job_df[protected_attr_col] == attr_favorable_value)
-            ].shape[0]
-            == 0
+            job_df[(job_df["idoneous"] == 1) & (job_df[protected_attr_col] == 1)].empty
         ):
             # Get the first idoneous candidate and replicate it with the specified protected attribute value
             candidate_to_replicate = job_df[job_df["idoneous"] == 1].iloc[0].copy()
-            candidate_to_replicate[protected_attr_col] = attr_favorable_value
+            candidate_to_replicate[protected_attr_col] = 1
 
             # Append the replicated candidate to the DataFrame
             job_df.loc[-1] = candidate_to_replicate
 
+            
         job_df = job_df.drop(
             columns=[
                 "job_id",
