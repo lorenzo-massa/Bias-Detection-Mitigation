@@ -8,6 +8,7 @@ import json
 import matplotlib.pyplot as plt
 from aif360.datasets import BinaryLabelDataset
 from aif360.metrics import BinaryLabelDatasetMetric
+from aif360.algorithms.preprocessing import DisparateImpactRemover
 
 DEFAULT_COLS = [
     "Sector",
@@ -499,3 +500,53 @@ def plot_histogram_metric(df, metric, sector, protected_attr_col):
     # Clear the plot
     plt.clf()
     plt.close()
+  
+def compute_repaired_df(df,sector,protected_attribute):
+  sector_df = df[df['job_sector'] == sector]
+  
+  job_list = sector_df["job_id"].unique()
+
+  job = job_list[0]
+  job_df = sector_df.copy()
+  job_df["idoneous"] = (job_df["job_id"] == job).astype(int)
+
+  job_df = job_df.drop(columns=["job_id","job_sector"])
+
+  binaryLabelDataset = BinaryLabelDataset(
+      favorable_label=1,
+      unfavorable_label=0,
+      df=job_df,
+      label_names=["idoneous"],
+      protected_attribute_names=[protected_attribute],
+  )
+
+  level = 0.8
+  di = DisparateImpactRemover(repair_level=level)
+
+  binaryLabelDataset_repaired = di.fit_transform(binaryLabelDataset)
+
+  job_df_orig = binaryLabelDataset.convert_to_dataframe()[0]
+  job_df_repaired = binaryLabelDataset_repaired.convert_to_dataframe()[0]
+
+  return job_df_orig, job_df_repaired
+
+
+def compute_bias_differences(df,sectors,protected_attribute,columns):
+  if protected_attribute == "same_location":
+    df["same_location"] = (df["cand_domicile_province"] == df["job_work_province"]).astype(int)
+    columns = df.columns.drop(["job_id","job_sector"])
+
+  results_df = pd.DataFrame(columns=columns)
+
+  for sector in sectors:
+    job_df_orig, job_df_repaired = compute_repaired_df(df,sector,protected_attribute)
+    sum_of_differences = []
+    for column in job_df_orig.columns[:-1]:  #do not compute for idoneous
+        difference = job_df_orig[column] - job_df_repaired[column]
+        sum_of_differences.append(difference.sum())
+
+    differences_df = pd.DataFrame([sum_of_differences], columns=columns)
+    results_df = pd.concat([results_df, differences_df], ignore_index=True)
+  return results_df
+
+
