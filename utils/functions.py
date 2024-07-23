@@ -466,7 +466,7 @@ def DIDI_r(data, pred, protected):
     return res
 
 
-def show_bias(df, protected_attr_col, attr_favorable_value):
+def show_bias(df, protected_attr_col, attr_favorable_value, plot_histogram=False):
 
     # Add a column to check if the candidate and the job are in the same location
     if protected_attr_col == "same_location":
@@ -475,9 +475,30 @@ def show_bias(df, protected_attr_col, attr_favorable_value):
         ).astype(int)
 
     all_sector_metrics = test_bias(df, protected_attr_col, attr_favorable_value)
-    all_sector_metrics =  all_sector_metrics.groupby("Sector").describe()
 
     # Save the results
     all_sector_metrics.to_csv("Results/bias_analysis_" + protected_attr_col + ".csv")
 
+    if plot_histogram:
+        for sector in df["job_sector"].unique():
+            plot_histogram_metric(all_sector_metrics, "Disparate_Impact", sector, protected_attr_col)
+            plot_histogram_metric(all_sector_metrics, "Statistical_Parity_Difference", sector, protected_attr_col)
+            plot_histogram_metric(all_sector_metrics, "DIDI", sector, protected_attr_col)
+
     return all_sector_metrics
+
+def plot_histogram_metric(df, metric, sector, protected_attr_col):
+    df_sector = df[df["Sector"] == sector]
+    plt.figure(figsize=(8, 6))
+    plt.hist(df_sector[metric], color="skyblue", bins=20, edgecolor="black")
+    plt.xlabel(metric)
+    plt.ylabel("Frequency")
+    plt.title(f"{metric} Distribution for {protected_attr_col} in {sector}")
+    plt.tight_layout()
+
+    # Save the figure
+    plt.savefig(f"Results/Plots/Distribution_{protected_attr_col}_{metric}_{sector}.png")
+
+    # Clear the plot
+    plt.clf()
+    plt.close()
