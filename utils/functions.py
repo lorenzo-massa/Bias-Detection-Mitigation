@@ -549,4 +549,38 @@ def compute_bias_differences(df,sectors,protected_attribute,columns):
     results_df = pd.concat([results_df, differences_df], ignore_index=True)
   return results_df
 
+def plot_series(series,title,xlabel,ylabel='Count'):
+    plt.bar(series.index, series.values, )
+    plt.title(title)
+    plt.xlabel(xlabel)
+    plt.ylabel(ylabel)
+    plt.xticks(rotation=90)
+    plt.show()
+
+def compare_plot(original,repaired,labels,title,xlabel,ylabel='Count',size=(6,6)):
+  width = 0.4
+  plt.figure(figsize=size)
+  x = np.arange(len(labels))
+  plt.bar(x - width/2, original, width, label='Original', color='skyblue', alpha=1)
+  plt.bar(x + width/2, repaired, width, label='Repaired', color='orange', alpha=1)
+
+  plt.title(title)
+  plt.xlabel(xlabel)
+  plt.ylabel(ylabel)
+  plt.xticks(x, labels, rotation=90)
+  plt.legend()
+  plt.show()
+
+
+def prepare_different_series(series1,series2):
+  all_index = sorted(set(series1.index).union(set(series2.index)))
+  orig_counts = series1.reindex(all_index, fill_value=0)
+  repaired_counts = series2.reindex(all_index, fill_value=0)
+  return orig_counts,repaired_counts,all_index
+
+def discretize_feature(data):
+  distances_km_discrete = np.zeros(10)
+  for dist in data:
+    distances_km_discrete[int(dist//10)] +=1
+  return distances_km_discrete
 
