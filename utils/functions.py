@@ -18,6 +18,114 @@ DEFAULT_COLS = [
     "DIDI",
 ]
 
+
+"""
+Data Exploration
+"""
+def get_rank_n_candidates(dataset, match_rank):
+  return dataset[dataset['match_rank'] == match_rank]
+
+def discretize_feature(data):
+  distances_km_discrete = np.zeros(10)
+  for dist in data:
+    distances_km_discrete[int(dist//10)] +=1
+  return distances_km_discrete
+
+def create_dictionary_from_series(series): #in percentage
+  dict_series = {}
+  total = np.sum(series.values)
+  for idx, val in zip(series.index,series.values):
+    dict_series[idx] = np.around((val/total),4)
+  return dict_series
+
+def create_dicts_rank_n(dataset,cols):
+  dict_list = []
+  distances_km = discretize_feature(dataset.distance_km)
+  total_distances = np.sum(distances_km)
+  dict_distances = {}
+  for i in range(10):
+    dict_distances[i] = np.around(distances_km[i]/total_distances,4)
+  dict_list.append(dict_distances)
+
+  for col in cols:
+    dict_list.append(create_dictionary_from_series(dataset[col].value_counts()))
+
+  return dict_list
+
+def create_table_for_feature(list_dict,idx=0):
+  selected_dicts = [sublist[idx] for sublist in list_dict]
+
+  total_keys = selected_dicts[0].keys()
+  for dictionary in selected_dicts[1:]:
+    for key in total_keys:
+      if key not in dictionary.keys():
+        dictionary[key] = 0
+
+  data = [list(d.values()) for d in selected_dicts]
+
+  return pd.DataFrame(np.vstack(data),columns=list(selected_dicts[0].keys()))
+
+def show_global_distribution(df,feature):
+    value_counts = df[feature].value_counts()
+
+    plt.bar(value_counts.index, value_counts.values, color='skyblue')
+    plt.title(f'Distribution of {feature}')
+    plt.xlabel(feature)
+    plt.ylabel('Count')
+    plt.xticks(rotation=90)
+    plt.show()
+
+def print_feature_distribution(dataframe, title): #across rank
+  dataframe.plot(kind='bar', stacked=True)
+  plt.title(f'Distribution of {title} by Rank')
+  plt.xlabel('Rank')
+  plt.ylabel('Proportion')
+  plt.xticks(rotation=0)
+  plt.legend(title=title)
+  plt.show()
+
+def plot_2_features(df, feature1, feature2, num_ranks=[1,2], num_cols=2, legend_outside = False, response=None):
+    data = []
+    if num_ranks == None:
+        fig, ax = plt.subplots(1, 1, figsize=(10, 8), constrained_layout=True)
+        distribution = df.groupby(feature1)[feature2].value_counts(normalize=True).unstack()
+        data.append(distribution)
+        distribution.plot(kind='bar', stacked=True, ax=ax)
+        ax.set_title(f'Full dataset')
+        ax.set_xlabel('')
+        ax.set_ylabel('Count')
+        ax.set_xticklabels(ax.get_xticklabels(), rotation=90)
+        if legend_outside:  
+          ax.legend(title=feature2, bbox_to_anchor=(1.05, 1), loc='upper left', fontsize='small')
+        else:
+          ax.legend(title=feature2)
+        plt.show()
+    else:
+
+      fig, axs = plt.subplots(1, num_cols, figsize=(10, 8), constrained_layout=True)
+      fig.suptitle(f'{feature1} Distribution by {feature2} for Different Ranks', fontsize=16)
+      for i, rank in enumerate(num_ranks):
+          if len(num_ranks) == 1:  # Handle single rank differently
+              ax = axs
+          else:
+              ax = axs[i]
+          new_df = df[df.match_rank == rank]
+          distribution = new_df.groupby(feature1)[feature2].value_counts(normalize=True).unstack()
+          distribution.plot(kind='bar', stacked=True, ax=ax)
+          data.append(distribution)
+          ax.set_title(f'Rank {rank}')
+          ax.set_xlabel('')
+          ax.set_ylabel('Count')
+          ax.set_xticklabels(ax.get_xticklabels(), rotation=90)  
+          if legend_outside:  
+            ax.legend(title=feature2, bbox_to_anchor=(1.05, 1), loc='upper left', fontsize='small')
+          else:
+            ax.legend(title=feature2)
+
+      plt.show()
+
+    if response != None:
+      return data
 """
 Data Preprocessing
 """
@@ -609,10 +717,3 @@ def prepare_different_series(series1, series2):
     orig_counts = series1.reindex(all_index, fill_value=0)
     repaired_counts = series2.reindex(all_index, fill_value=0)
     return orig_counts, repaired_counts, all_index
-
-
-def discretize_feature(data):
-    distances_km_discrete = np.zeros(10)
-    for dist in data:
-        distances_km_discrete[int(dist // 10)] += 1
-    return distances_km_discrete
