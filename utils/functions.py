@@ -342,6 +342,7 @@ def get_sector_metric(
     # Retrieve unique job IDs for the specified sector
     job_list = sector_df["job_id"].unique()
     job_info_list = []
+    no_idoneous_sectors = 0
 
     for job in job_list:
         # Identify idoneous candidates directly without splitting and concatenating DataFrames
@@ -357,13 +358,16 @@ def get_sector_metric(
 
         # Transform the protected attribute value to binary
         job_df[protected_attr_col] = (
-            job_df[protected_attr_col] == attr_favorable_value # 1 if the candidate has the favorable attribute value
+            job_df[protected_attr_col]
+            == attr_favorable_value  # 1 if the candidate has the favorable attribute value
         ).astype(int)
 
         # If there are no idoneous candidates with the specified protected attribute value, replicate one
-        if (
-            job_df[(job_df["idoneous"] == 1) & (job_df[protected_attr_col] == 1)].empty
-        ):
+        if job_df[(job_df["idoneous"] == 1) & (job_df[protected_attr_col] == 1)].empty:
+            # Skip the job if there are no idoneous candidates
+            no_idoneous_sectors += 1
+            continue
+
             # Get the first idoneous candidate and replicate it with the specified protected attribute value
             candidate_to_replicate = job_df[job_df["idoneous"] == 1].iloc[0].copy()
             candidate_to_replicate[protected_attr_col] = 1
@@ -371,7 +375,6 @@ def get_sector_metric(
             # Append the replicated candidate to the DataFrame
             job_df.loc[-1] = candidate_to_replicate
 
-            
         job_df = job_df.drop(
             columns=[
                 "job_id",
@@ -417,6 +420,11 @@ def get_sector_metric(
             DIDI_metric,
         ]
         job_info_list.append(job_info)
+
+    if no_idoneous_sectors > 0:
+        print(
+            f"Skipped {no_idoneous_sectors} jobs with no idoneous candidates in sector {sector}."
+        )
 
     return pd.DataFrame(job_info_list, columns=DEFAULT_COLS)
 
@@ -479,11 +487,21 @@ def show_bias(df, protected_attr_col, attr_favorable_value, plot_histogram=False
 
     if plot_histogram:
         for sector in df["job_sector"].unique():
-            plot_histogram_metric(all_sector_metrics, "Disparate_Impact", sector, protected_attr_col)
-            plot_histogram_metric(all_sector_metrics, "Statistical_Parity_Difference", sector, protected_attr_col)
-            plot_histogram_metric(all_sector_metrics, "DIDI", sector, protected_attr_col)
+            plot_histogram_metric(
+                all_sector_metrics, "Disparate_Impact", sector, protected_attr_col
+            )
+            plot_histogram_metric(
+                all_sector_metrics,
+                "Statistical_Parity_Difference",
+                sector,
+                protected_attr_col,
+            )
+            plot_histogram_metric(
+                all_sector_metrics, "DIDI", sector, protected_attr_col
+            )
 
     return all_sector_metrics
+
 
 def plot_histogram_metric(df, metric, sector, protected_attr_col):
     df_sector = df[df["Sector"] == sector]
@@ -495,92 +513,106 @@ def plot_histogram_metric(df, metric, sector, protected_attr_col):
     plt.tight_layout()
 
     # Save the figure
-    plt.savefig(f"Results/Plots/Distribution_{protected_attr_col}_{metric}_{sector}.png")
+    plt.savefig(
+        f"Results/Plots/Distribution_{protected_attr_col}_{metric}_{sector}.png"
+    )
 
     # Clear the plot
     plt.clf()
     plt.close()
-  
-def compute_repaired_df(df,sector,protected_attribute):
-  sector_df = df[df['job_sector'] == sector]
-  
-  job_list = sector_df["job_id"].unique()
-
-  job = job_list[0]
-  job_df = sector_df.copy()
-  job_df["idoneous"] = (job_df["job_id"] == job).astype(int)
-
-  job_df = job_df.drop(columns=["job_id","job_sector"])
-
-  binaryLabelDataset = BinaryLabelDataset(
-      favorable_label=1,
-      unfavorable_label=0,
-      df=job_df,
-      label_names=["idoneous"],
-      protected_attribute_names=[protected_attribute],
-  )
-
-  level = 0.8
-  di = DisparateImpactRemover(repair_level=level)
-
-  binaryLabelDataset_repaired = di.fit_transform(binaryLabelDataset)
-
-  job_df_orig = binaryLabelDataset.convert_to_dataframe()[0]
-  job_df_repaired = binaryLabelDataset_repaired.convert_to_dataframe()[0]
-
-  return job_df_orig, job_df_repaired
 
 
-def compute_bias_differences(df,sectors,protected_attribute,columns):
-  if protected_attribute == "same_location":
-    df["same_location"] = (df["cand_domicile_province"] == df["job_work_province"]).astype(int)
-    columns = df.columns.drop(["job_id","job_sector"])
+def compute_repaired_df(df, sector, protected_attribute):
+    sector_df = df[df["job_sector"] == sector]
 
-  results_df = pd.DataFrame(columns=columns)
+    job_list = sector_df["job_id"].unique()
 
-  for sector in sectors:
-    job_df_orig, job_df_repaired = compute_repaired_df(df,sector,protected_attribute)
-    sum_of_differences = []
-    for column in job_df_orig.columns[:-1]:  #do not compute for idoneous
-        difference = job_df_orig[column] - job_df_repaired[column]
-        sum_of_differences.append(difference.sum())
+    job = job_list[0]
+    job_df = sector_df.copy()
+    job_df["idoneous"] = (job_df["job_id"] == job).astype(int)
 
-    differences_df = pd.DataFrame([sum_of_differences], columns=columns)
-    results_df = pd.concat([results_df, differences_df], ignore_index=True)
-  return results_df
+    job_df = job_df.drop(columns=["job_id", "job_sector"])
 
-def plot_series(series,title,xlabel,ylabel='Count'):
-    plt.bar(series.index, series.values, )
+    binaryLabelDataset = BinaryLabelDataset(
+        favorable_label=1,
+        unfavorable_label=0,
+        df=job_df,
+        label_names=["idoneous"],
+        protected_attribute_names=[protected_attribute],
+    )
+
+    level = 0.8
+    di = DisparateImpactRemover(repair_level=level)
+
+    binaryLabelDataset_repaired = di.fit_transform(binaryLabelDataset)
+
+    job_df_orig = binaryLabelDataset.convert_to_dataframe()[0]
+    job_df_repaired = binaryLabelDataset_repaired.convert_to_dataframe()[0]
+
+    return job_df_orig, job_df_repaired
+
+
+def compute_bias_differences(df, sectors, protected_attribute, columns):
+    if protected_attribute == "same_location":
+        df["same_location"] = (
+            df["cand_domicile_province"] == df["job_work_province"]
+        ).astype(int)
+        columns = df.columns.drop(["job_id", "job_sector"])
+
+    results_df = pd.DataFrame(columns=columns)
+
+    for sector in sectors:
+        job_df_orig, job_df_repaired = compute_repaired_df(
+            df, sector, protected_attribute
+        )
+        sum_of_differences = []
+        for column in job_df_orig.columns[:-1]:  # do not compute for idoneous
+            difference = job_df_orig[column] - job_df_repaired[column]
+            sum_of_differences.append(difference.sum())
+
+        differences_df = pd.DataFrame([sum_of_differences], columns=columns)
+        results_df = pd.concat([results_df, differences_df], ignore_index=True)
+    return results_df
+
+
+def plot_series(series, title, xlabel, ylabel="Count"):
+    plt.bar(
+        series.index,
+        series.values,
+    )
     plt.title(title)
     plt.xlabel(xlabel)
     plt.ylabel(ylabel)
     plt.xticks(rotation=90)
     plt.show()
 
-def compare_plot(original,repaired,labels,title,xlabel,ylabel='Count',size=(6,6)):
-  width = 0.4
-  plt.figure(figsize=size)
-  x = np.arange(len(labels))
-  plt.bar(x - width/2, original, width, label='Original', color='skyblue', alpha=1)
-  plt.bar(x + width/2, repaired, width, label='Repaired', color='orange', alpha=1)
 
-  plt.title(title)
-  plt.xlabel(xlabel)
-  plt.ylabel(ylabel)
-  plt.xticks(x, labels, rotation=90)
-  plt.legend()
-  plt.show()
+def compare_plot(
+    original, repaired, labels, title, xlabel, ylabel="Count", size=(6, 6)
+):
+    width = 0.4
+    plt.figure(figsize=size)
+    x = np.arange(len(labels))
+    plt.bar(x - width / 2, original, width, label="Original", color="skyblue", alpha=1)
+    plt.bar(x + width / 2, repaired, width, label="Repaired", color="orange", alpha=1)
+
+    plt.title(title)
+    plt.xlabel(xlabel)
+    plt.ylabel(ylabel)
+    plt.xticks(x, labels, rotation=90)
+    plt.legend()
+    plt.show()
 
 
-def prepare_different_series(series1,series2):
-  all_index = sorted(set(series1.index).union(set(series2.index)))
-  orig_counts = series1.reindex(all_index, fill_value=0)
-  repaired_counts = series2.reindex(all_index, fill_value=0)
-  return orig_counts,repaired_counts,all_index
+def prepare_different_series(series1, series2):
+    all_index = sorted(set(series1.index).union(set(series2.index)))
+    orig_counts = series1.reindex(all_index, fill_value=0)
+    repaired_counts = series2.reindex(all_index, fill_value=0)
+    return orig_counts, repaired_counts, all_index
+
 
 def discretize_feature(data):
-  distances_km_discrete = np.zeros(10)
-  for dist in data:
-    distances_km_discrete[int(dist//10)] +=1
-  return distances_km_discrete
-
+    distances_km_discrete = np.zeros(10)
+    for dist in data:
+        distances_km_discrete[int(dist // 10)] += 1
+    return distances_km_discrete
