@@ -1,11 +1,1 @@
-{
-    "Dottorato": 8,
-    "Master": 7,
-    "Laurea": 6,
-    "Attestato": 5,
-    "Diploma": 4,
-    "ITS": 3,
-    "Media": 2,
-    "Elementare": 1,
-    "Null": 0
-}
+{"Dottorato": 8, "Master": 7, "Laurea": 6, "Attestato": 5, "Diploma": 4, "ITS": 3, "Media": 2, "Elementare": 1, "Null": 0}
