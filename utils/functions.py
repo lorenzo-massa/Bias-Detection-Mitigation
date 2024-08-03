@@ -22,110 +22,147 @@ DEFAULT_COLS = [
 """
 Data Exploration
 """
+
+
 def get_rank_n_candidates(dataset, match_rank):
-  return dataset[dataset['match_rank'] == match_rank]
+    return dataset[dataset["match_rank"] == match_rank]
+
 
 def discretize_feature(data):
-  distances_km_discrete = np.zeros(10)
-  for dist in data:
-    distances_km_discrete[int(dist//10)] +=1
-  return distances_km_discrete
+    distances_km_discrete = np.zeros(10)
+    for dist in data:
+        distances_km_discrete[int(dist // 10)] += 1
+    return distances_km_discrete
 
-def create_dictionary_from_series(series): #in percentage
-  dict_series = {}
-  total = np.sum(series.values)
-  for idx, val in zip(series.index,series.values):
-    dict_series[idx] = np.around((val/total),4)
-  return dict_series
 
-def create_dicts_rank_n(dataset,cols):
-  dict_list = []
-  distances_km = discretize_feature(dataset.distance_km)
-  total_distances = np.sum(distances_km)
-  dict_distances = {}
-  for i in range(10):
-    dict_distances[i] = np.around(distances_km[i]/total_distances,4)
-  dict_list.append(dict_distances)
+def create_dictionary_from_series(series):  # in percentage
+    dict_series = {}
+    total = np.sum(series.values)
+    for idx, val in zip(series.index, series.values):
+        dict_series[idx] = np.around((val / total), 4)
+    return dict_series
 
-  for col in cols:
-    dict_list.append(create_dictionary_from_series(dataset[col].value_counts()))
 
-  return dict_list
+def create_dicts_rank_n(dataset, cols):
+    dict_list = []
+    distances_km = discretize_feature(dataset.distance_km)
+    total_distances = np.sum(distances_km)
+    dict_distances = {}
+    for i in range(10):
+        dict_distances[i] = np.around(distances_km[i] / total_distances, 4)
+    dict_list.append(dict_distances)
 
-def create_table_for_feature(list_dict,idx=0):
-  selected_dicts = [sublist[idx] for sublist in list_dict]
+    for col in cols:
+        dict_list.append(create_dictionary_from_series(dataset[col].value_counts()))
 
-  total_keys = selected_dicts[0].keys()
-  for dictionary in selected_dicts[1:]:
-    for key in total_keys:
-      if key not in dictionary.keys():
-        dictionary[key] = 0
+    return dict_list
 
-  data = [list(d.values()) for d in selected_dicts]
 
-  return pd.DataFrame(np.vstack(data),columns=list(selected_dicts[0].keys()))
+def create_table_for_feature(list_dict, idx=0):
+    selected_dicts = [sublist[idx] for sublist in list_dict]
 
-def show_global_distribution(df,feature):
+    total_keys = selected_dicts[0].keys()
+    for dictionary in selected_dicts[1:]:
+        for key in total_keys:
+            if key not in dictionary.keys():
+                dictionary[key] = 0
+
+    data = [list(d.values()) for d in selected_dicts]
+
+    return pd.DataFrame(np.vstack(data), columns=list(selected_dicts[0].keys()))
+
+
+def show_global_distribution(df, feature):
     value_counts = df[feature].value_counts()
 
-    plt.bar(value_counts.index, value_counts.values, color='skyblue')
-    plt.title(f'Distribution of {feature}')
+    plt.bar(value_counts.index, value_counts.values, color="skyblue")
+    plt.title(f"Distribution of {feature}")
     plt.xlabel(feature)
-    plt.ylabel('Count')
+    plt.ylabel("Count")
     plt.xticks(rotation=90)
     plt.show()
 
-def print_feature_distribution(dataframe, title): #across rank
-  dataframe.plot(kind='bar', stacked=True)
-  plt.title(f'Distribution of {title} by Rank')
-  plt.xlabel('Rank')
-  plt.ylabel('Proportion')
-  plt.xticks(rotation=0)
-  plt.legend(title=title)
-  plt.show()
 
-def plot_2_features(df, feature1, feature2, num_ranks=[1,2], num_cols=2, legend_outside = False, response=None):
+def print_feature_distribution(dataframe, title):  # across rank
+    dataframe.plot(kind="bar", stacked=True)
+    plt.title(f"Distribution of {title} by Rank")
+    plt.xlabel("Rank")
+    plt.ylabel("Proportion")
+    plt.xticks(rotation=0)
+    plt.legend(title=title)
+    plt.show()
+
+
+def plot_2_features(
+    df,
+    feature1,
+    feature2,
+    num_ranks=[1, 2],
+    num_cols=2,
+    legend_outside=False,
+    response=None,
+):
     data = []
     if num_ranks == None:
         fig, ax = plt.subplots(1, 1, figsize=(10, 8), constrained_layout=True)
-        distribution = df.groupby(feature1)[feature2].value_counts(normalize=True).unstack()
+        distribution = (
+            df.groupby(feature1)[feature2].value_counts(normalize=True).unstack()
+        )
         data.append(distribution)
-        distribution.plot(kind='bar', stacked=True, ax=ax)
-        ax.set_title(f'Full dataset')
-        ax.set_xlabel('')
-        ax.set_ylabel('Count')
+        distribution.plot(kind="bar", stacked=True, ax=ax)
+        ax.set_title("Full dataset")
+        ax.set_xlabel("")
+        ax.set_ylabel("Count")
         ax.set_xticklabels(ax.get_xticklabels(), rotation=90)
-        if legend_outside:  
-          ax.legend(title=feature2, bbox_to_anchor=(1.05, 1), loc='upper left', fontsize='small')
+        if legend_outside:
+            ax.legend(
+                title=feature2,
+                bbox_to_anchor=(1.05, 1),
+                loc="upper left",
+                fontsize="small",
+            )
         else:
-          ax.legend(title=feature2)
+            ax.legend(title=feature2)
         plt.show()
     else:
 
-      fig, axs = plt.subplots(1, num_cols, figsize=(10, 8), constrained_layout=True)
-      fig.suptitle(f'{feature1} Distribution by {feature2} for Different Ranks', fontsize=16)
-      for i, rank in enumerate(num_ranks):
-          if len(num_ranks) == 1:  # Handle single rank differently
-              ax = axs
-          else:
-              ax = axs[i]
-          new_df = df[df.match_rank == rank]
-          distribution = new_df.groupby(feature1)[feature2].value_counts(normalize=True).unstack()
-          distribution.plot(kind='bar', stacked=True, ax=ax)
-          data.append(distribution)
-          ax.set_title(f'Rank {rank}')
-          ax.set_xlabel('')
-          ax.set_ylabel('Count')
-          ax.set_xticklabels(ax.get_xticklabels(), rotation=90)  
-          if legend_outside:  
-            ax.legend(title=feature2, bbox_to_anchor=(1.05, 1), loc='upper left', fontsize='small')
-          else:
-            ax.legend(title=feature2)
+        fig, axs = plt.subplots(1, num_cols, figsize=(10, 8), constrained_layout=True)
+        fig.suptitle(
+            f"{feature1} Distribution by {feature2} for Different Ranks", fontsize=16
+        )
+        for i, rank in enumerate(num_ranks):
+            if len(num_ranks) == 1:  # Handle single rank differently
+                ax = axs
+            else:
+                ax = axs[i]
+            new_df = df[df.match_rank == rank]
+            distribution = (
+                new_df.groupby(feature1)[feature2]
+                .value_counts(normalize=True)
+                .unstack()
+            )
+            distribution.plot(kind="bar", stacked=True, ax=ax)
+            data.append(distribution)
+            ax.set_title(f"Rank {rank}")
+            ax.set_xlabel("")
+            ax.set_ylabel("Count")
+            ax.set_xticklabels(ax.get_xticklabels(), rotation=90)
+            if legend_outside:
+                ax.legend(
+                    title=feature2,
+                    bbox_to_anchor=(1.05, 1),
+                    loc="upper left",
+                    fontsize="small",
+                )
+            else:
+                ax.legend(title=feature2)
 
-      plt.show()
+        plt.show()
 
     if response != None:
-      return data
+        return data
+
+
 """
 Data Preprocessing
 """
@@ -416,7 +453,7 @@ def get_sector_metric(
     sector_column="job_sector",
 ):
     """
-    Calculate fairness metrics for each job in a sector.
+    Calculate fairness metrics for each job in the specified sector.
 
     Parameters:
     - df: DataFrame to analyze.
@@ -538,6 +575,17 @@ def get_sector_metric(
 
 
 def test_bias(df, protected_attr_col, attr_favorable_value):
+    """
+    Test bias for each sector in the DataFrame.
+
+    Parameters:
+    - df: DataFrame to analyze.
+    - protected_attr_col: Protected attribute column name.
+    - attr_favorable_value: Protected attribute value.
+
+    Returns:
+    - DataFrame containing fairness metrics for each sector.
+    """
     sectors = df["job_sector"].unique()
     all_sector_metrics = pd.DataFrame(columns=DEFAULT_COLS)
 
@@ -552,6 +600,17 @@ def test_bias(df, protected_attr_col, attr_favorable_value):
 def get_all_sectors_metrics(
     df, sector_column="job_sector", protected_attribute="cand_gender"
 ):
+    """
+    Calculate fairness metrics for each sector in the DataFrame.
+
+    Parameters:
+    - df: DataFrame to analyze.
+    - sector_column: Sector column name. Default is 'job_sector'.
+    - protected_attribute: Protected attribute column name to analyze for bias. Default is "cand_gender".
+
+    Returns:
+    - DataFrame containing fairness metrics for each sector.
+    """
     sectors = df[sector_column].unique()
     all_sector_metrics = pd.DataFrame(columns=DEFAULT_COLS)
 
@@ -567,10 +626,6 @@ def get_all_sectors_metrics(
     return all_sector_metrics
 
 
-###################################################################################################################
-
-
-# Function to compute DIDI
 def DIDI_r(data, pred, protected):
     res, avg = 0, np.mean(pred)
     for aname, dom in protected.items():
@@ -581,6 +636,18 @@ def DIDI_r(data, pred, protected):
 
 
 def show_bias(df, protected_attr_col, attr_favorable_value, plot_histogram=False):
+    """
+    Show bias analysis for the specified protected attribute column.
+
+    Parameters:
+    - df: DataFrame to analyze.
+    - protected_attr_col: Protected attribute column name.
+    - attr_favorable_value: Protected attribute value.
+    - plot_histogram: Boolean indicating whether to plot histograms for each sector.
+
+    Returns:
+    - DataFrame containing fairness metrics for each sector.
+    """
 
     # Add a column to check if the candidate and the job are in the same location
     if protected_attr_col == "same_location":
@@ -596,22 +663,37 @@ def show_bias(df, protected_attr_col, attr_favorable_value, plot_histogram=False
     if plot_histogram:
         for sector in df["job_sector"].unique():
             plot_histogram_metric(
-                all_sector_metrics, "Disparate_Impact", sector, protected_attr_col
+                all_sector_metrics,
+                "Disparate_Impact",
+                sector,
+                protected_attr_col,
+                save=True,
             )
             plot_histogram_metric(
                 all_sector_metrics,
                 "Statistical_Parity_Difference",
                 sector,
                 protected_attr_col,
+                save=True,
             )
             plot_histogram_metric(
-                all_sector_metrics, "DIDI", sector, protected_attr_col
+                all_sector_metrics, "DIDI", sector, protected_attr_col, save=True
             )
 
     return all_sector_metrics
 
 
-def plot_histogram_metric(df, metric, sector, protected_attr_col):
+def plot_histogram_metric(df, metric, sector, protected_attr_col, save=True):
+    """
+    Plot a histogram for the specified metric in the specified sector.
+
+    Parameters:
+    - df: DataFrame containing the metrics.
+    - metric: Metric to plot.
+    - sector: Sector to analyze.
+    - protected_attr_col: Protected attribute column name.
+    - save: Boolean indicating whether to save the plot. Default is True. If False, the plot is displayed.
+    """
     df_sector = df[df["Sector"] == sector]
     plt.figure(figsize=(8, 6))
     plt.hist(df_sector[metric], color="skyblue", bins=20, edgecolor="black")
@@ -620,17 +702,29 @@ def plot_histogram_metric(df, metric, sector, protected_attr_col):
     plt.title(f"{metric} Distribution for {protected_attr_col} in {sector}")
     plt.tight_layout()
 
-    # Save the figure
-    plt.savefig(
-        f"Results/Plots/Distribution_{protected_attr_col}_{metric}_{sector}.png"
-    )
-
-    # Clear the plot
-    plt.clf()
-    plt.close()
+    if save:
+        plt.savefig(
+            f"Results/Plots/Histogram_{protected_attr_col}_{metric}_{sector}.png"
+        )
+        plt.clf()
+        plt.close()
+    else:
+        plt.show()
 
 
 def compute_repaired_df(df, sector, protected_attribute):
+    """
+    Compute the repaired DataFrame for the specified sector and protected attribute.
+
+    Parameters:
+    - df: DataFrame to analyze.
+    - sector: Sector to analyze.
+    - protected_attribute: Protected attribute column name.
+
+    Returns:
+    - Original DataFrame for the specified sector and protected attribute.
+    - Repaired DataFrame for the specified sector and protected attribute.
+    """
     sector_df = df[df["job_sector"] == sector]
 
     job_list = sector_df["job_id"].unique()
@@ -661,6 +755,18 @@ def compute_repaired_df(df, sector, protected_attribute):
 
 
 def compute_bias_differences(df, sectors, protected_attribute, columns):
+    """
+    Compute the differences between the original and repaired DataFrames for each sector.
+
+    Parameters:
+    - df: DataFrame to analyze.
+    - sectors: List of sectors to analyze.
+    - protected_attribute: Protected attribute column name.
+    - columns: List of columns to analyze.
+
+    Returns:
+    - DataFrame containing the differences between the original and repaired DataFrames for each sector.
+    """
     if protected_attribute == "same_location":
         df["same_location"] = (
             df["cand_domicile_province"] == df["job_work_province"]
