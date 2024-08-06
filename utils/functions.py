@@ -101,6 +101,7 @@ def plot_2_features(
     num_cols=2,
     legend_outside=False,
     response=None,
+    x_axis_rotation=90,
 ):
     data = []
     if num_ranks == None:
@@ -123,6 +124,7 @@ def plot_2_features(
             )
         else:
             ax.legend(title=feature2)
+            ax.set_xticklabels(ax.get_xticklabels(), rotation=x_axis_rotation)
         plt.show()
     else:
 
@@ -156,6 +158,8 @@ def plot_2_features(
                 )
             else:
                 ax.legend(title=feature2)
+                ax.set_xticklabels(ax.get_xticklabels(), rotation=x_axis_rotation)
+
 
         plt.show()
 
