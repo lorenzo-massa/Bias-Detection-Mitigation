@@ -758,7 +758,7 @@ def compute_repaired_df(df, sector, protected_attribute):
     return job_df_orig, job_df_repaired
 
 
-def compute_bias_differences(df, sectors, protected_attribute, columns):
+def compute_bias_differences_percentage(df, sectors, protected_attribute, columns):
     """
     Compute the differences between the original and repaired DataFrames for each sector.
 
@@ -783,12 +783,19 @@ def compute_bias_differences(df, sectors, protected_attribute, columns):
         job_df_orig, job_df_repaired = compute_repaired_df(
             df, sector, protected_attribute
         )
-        sum_of_differences = []
-        for column in job_df_orig.columns[:-1]:  # do not compute for idoneous
-            difference = job_df_orig[column] - job_df_repaired[column]
-            sum_of_differences.append(difference.sum())
+        percentage_of_differences = []
+        total_count = job_df_orig.shape[0]
 
-        differences_df = pd.DataFrame([sum_of_differences], columns=columns)
+        for column in job_df_orig.columns[:-1]:  # do not compute for idoneous
+            # Create a boolean mask where elements are different
+            differences = job_df_orig[column] != job_df_repaired[column]
+            # Count the number of True values in the mask
+            num_differences = differences.sum()
+            # Compute the percentage of differing elements
+            percentage = round((num_differences / total_count) * 100, 2)
+            percentage_of_differences.append(percentage)
+
+        differences_df = pd.DataFrame([percentage_of_differences], columns=columns)
         results_df = pd.concat([results_df, differences_df], ignore_index=True)
     return results_df
 
