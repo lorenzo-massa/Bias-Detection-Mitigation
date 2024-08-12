@@ -758,7 +758,7 @@ def compute_repaired_df(df, sector, protected_attribute):
     return job_df_orig, job_df_repaired
 
 
-def compute_bias_differences_percentage(df, sectors, protected_attribute, columns):
+def compute_bias_differences_percentage(df, sectors, protected_attribute, columns, mode='percentage'):
     """
     Compute the differences between the original and repaired DataFrames for each sector.
 
@@ -767,6 +767,7 @@ def compute_bias_differences_percentage(df, sectors, protected_attribute, column
     - sectors: List of sectors to analyze.
     - protected_attribute: Protected attribute column name.
     - columns: List of columns to analyze.
+    - mode: percentage or total.
 
     Returns:
     - DataFrame containing the differences between the original and repaired DataFrames for each sector.
@@ -783,19 +784,18 @@ def compute_bias_differences_percentage(df, sectors, protected_attribute, column
         job_df_orig, job_df_repaired = compute_repaired_df(
             df, sector, protected_attribute
         )
-        percentage_of_differences = []
-        total_count = job_df_orig.shape[0]
-
+        differences_list = []
         for column in job_df_orig.columns[:-1]:  # do not compute for idoneous
-            # Create a boolean mask where elements are different
             differences = job_df_orig[column] != job_df_repaired[column]
-            # Count the number of True values in the mask
             num_differences = differences.sum()
-            # Compute the percentage of differing elements
-            percentage = round((num_differences / total_count) * 100, 2)
-            percentage_of_differences.append(percentage)
+            if mode == 'percentage':
+                total_count = job_df_orig.shape[0]
+                percentage = round((num_differences / total_count) * 100, 2)
+                differences_list.append(percentage)
+            else:
+                differences_list.append(num_differences)
 
-        differences_df = pd.DataFrame([percentage_of_differences], columns=columns)
+        differences_df = pd.DataFrame([differences_list], columns=columns)
         results_df = pd.concat([results_df, differences_df], ignore_index=True)
     return results_df
 
